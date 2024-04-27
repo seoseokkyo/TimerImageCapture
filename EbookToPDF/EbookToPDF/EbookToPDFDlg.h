@@ -55,6 +55,11 @@ private:
 
 	int m_nMaxCount;
 
+	int m_iCaptureStartX;
+	int m_iCaptureStartY;
+	int m_iCaptureWidth;
+	int m_iCaptureHeight;
+
 public:
 
 	//// Member Functions	
@@ -71,6 +76,8 @@ private:
 	void CheckMonitor();
 
 	CString ImageCaputre(std::string dirName, int iCount);
+	void ThreadCaputre(std::pair<std::string,int> pairData);
+	void SetCaputreSize();
 
 public:
 	CString SetComboSel(int iSel);
@@ -85,4 +92,6 @@ public:
 	afx_msg void OnBnClickedButtonSetRegion();
 	virtual BOOL PreTranslateMessage(MSG* pMsg);
 	afx_msg void OnBnClickedButtonCaptureStart();
+	afx_msg void OnBnClickedButtonExit();
+	afx_msg void OnBnClickedButtonMinimize();
 };

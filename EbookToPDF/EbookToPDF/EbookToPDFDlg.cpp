@@ -72,6 +72,8 @@ BEGIN_MESSAGE_MAP(CEbookToPDFDlg, CDialogEx)
 	ON_BN_CLICKED(IDC_BUTTON_CAPUTRE, &CEbookToPDFDlg::OnBnClickedButtonCaputre)
 	ON_BN_CLICKED(IDC_BUTTON_SET_REGION, &CEbookToPDFDlg::OnBnClickedButtonSetRegion)
 	ON_BN_CLICKED(IDC_BUTTON_CAPTURE_START, &CEbookToPDFDlg::OnBnClickedButtonCaptureStart)
+	ON_BN_CLICKED(IDC_BUTTON_EXIT, &CEbookToPDFDlg::OnBnClickedButtonExit)
+	ON_BN_CLICKED(IDC_BUTTON_MINIMIZE, &CEbookToPDFDlg::OnBnClickedButtonMinimize)
 END_MESSAGE_MAP()
 
 
@@ -183,6 +185,9 @@ CString CEbookToPDFDlg::InitControls(int iOffsetX, int iOffsetY)
 	{
 		this->MoveWindow(500, 20, 1000, 500);
 	}
+
+	GetDlgItem(IDC_BUTTON_EXIT)->MoveWindow(iOffsetX + 950, iOffsetY, 30, 30);
+	GetDlgItem(IDC_BUTTON_MINIMIZE)->MoveWindow(iOffsetX + 915, iOffsetY, 30, 30);
 
 	GetDlgItem(IDC_STATIC_MONITOR_SELECT)->MoveWindow(iOffsetX + 100, iOffsetY + 100, 100, 30);
 	GetDlgItem(IDC_COMBO_SELECTED_MONITOR)->MoveWindow(iOffsetX + 100, iOffsetY + 130, 100, 30);
@@ -380,6 +385,23 @@ CString CEbookToPDFDlg::ImageCaputre(std::string dirName,int iCount)
 	// 스크린 전체를 캡쳐하기 위해서 CWindowDC 형식으로 DC를 얻는다.
 	// GetDC의 파라메터에 특정 윈도우 핸들을 넣지 않고 NULL을 넣으면
 	// CWindowDC 형식으로 DC를 얻게 된다.
+
+	std::thread threadFunction(&CEbookToPDFDlg::ThreadCaputre, this, make_pair(dirName, iCount));
+
+	while (1)
+	{
+		if (threadFunction.joinable())
+		{
+			threadFunction.join();
+			break;
+		}
+	}
+
+	return DStrSuccess;
+}
+
+void CEbookToPDFDlg::ThreadCaputre(std::pair<std::string, int> pairData)
+{
 	HDC h_screen_dc = ::GetDC(NULL);
 
 	//int iStartX = m_vtMonitorData[m_iSelected].iStartX;
@@ -387,15 +409,10 @@ CString CEbookToPDFDlg::ImageCaputre(std::string dirName,int iCount)
 	//int iWidth = m_vtMonitorData[m_iSelected].iMonitorWidth;
 	//int iHeight = m_vtMonitorData[m_iSelected].iMonitorHeight;
 
-	CString strData;
-	GetDlgItem(IDC_EDIT_SELECT_REGION_START_X)->GetWindowTextW(strData);
-	int iStartX = _ttoi(strData);
-	GetDlgItem(IDC_EDIT_SELECT_REGION_START_Y)->GetWindowTextW(strData);
-	int iStartY = _ttoi(strData);
-	GetDlgItem(IDC_EDIT_SELECT_REGION_END_X)->GetWindowTextW(strData);
-	int iWidth = _ttoi(strData) - iStartX;
-	GetDlgItem(IDC_EDIT_SELECT_REGION_END_Y)->GetWindowTextW(strData);
-	int iHeight = _ttoi(strData) - iStartY;
+	int iStartX = this->m_iCaptureStartX;
+	int iStartY = this->m_iCaptureStartY;
+	int iWidth = this->m_iCaptureWidth;
+	int iHeight = this->m_iCaptureHeight;
 
 	// DIB의 형식을 정의한다.
 	BITMAPINFO dib_define;
@@ -440,17 +457,17 @@ CString CEbookToPDFDlg::ImageCaputre(std::string dirName,int iCount)
 	dib_format_layout.bfSize = sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER) + dib_define.bmiHeader.biSizeImage;
 	dib_format_layout.bfOffBits = sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER);
 
-	CString strDirName(dirName.c_str());
+	CString strDirName(pairData.first.c_str());
 	strDirName += _T("\\");
 	::CreateDirectory(strDirName, nullptr);
 
 	CString strFileName;
-	strFileName.Format(_T("image%04d.bmp"), iCount);
+	strFileName.Format(_T("image%04d.bmp"), pairData.second);
 
 	// DIB 파일을 생성한다.
 	FILE* p_file;
 
-	std::string strFilePath = dirName + "\\" + std::string((CT2CA)strFileName);
+	std::string strFilePath = pairData.first + "\\" + std::string((CT2CA)strFileName);
 	fopen_s(&p_file, strFilePath.c_str(), "wb");
 
 	if (p_file != NULL) {
@@ -459,31 +476,30 @@ CString CEbookToPDFDlg::ImageCaputre(std::string dirName,int iCount)
 		fwrite(p_image_data, 1, dib_define.bmiHeader.biSizeImage, p_file);
 		fclose(p_file);
 	}
-	else
-	{
-		return DStrError;
-	}
 
 	// 사용했던 비트맵과 DC 를 해제한다.
 	if (NULL != h_bitmap)
 	{
 		DeleteObject(h_bitmap);
 	}
-	else
-	{
-		return DStrError;
-	}
 
 	if (NULL != h_screen_dc)
 	{
 		::ReleaseDC(NULL, h_screen_dc);
 	}
-	else
-	{
-		return DStrError;
-	}
+}
 
-	return DStrSuccess;
+void CEbookToPDFDlg::SetCaputreSize()
+{
+	CString strData;
+	GetDlgItem(IDC_EDIT_SELECT_REGION_START_X)->GetWindowTextW(strData);
+	m_iCaptureStartX = _ttoi(strData);
+	GetDlgItem(IDC_EDIT_SELECT_REGION_START_Y)->GetWindowTextW(strData);
+	m_iCaptureStartY = _ttoi(strData);
+	GetDlgItem(IDC_EDIT_SELECT_REGION_END_X)->GetWindowTextW(strData);
+	m_iCaptureWidth = _ttoi(strData) - m_iCaptureStartX;
+	GetDlgItem(IDC_EDIT_SELECT_REGION_END_Y)->GetWindowTextW(strData);
+	m_iCaptureHeight = _ttoi(strData) - m_iCaptureStartY;
 }
 
 CString CEbookToPDFDlg::SetComboSel(int iSel)
@@ -506,13 +522,14 @@ CString CEbookToPDFDlg::SetComboSel(int iSel)
 
 CString CEbookToPDFDlg::ImageCaputre()
 {
-	// 캡쳐를 하기 위해서 화면에서 현재 프로그램을 감춘다.
-	ShowWindow(SW_HIDE);
-
 	CString strTemp;
 	GetDlgItemText(IDC_EDIT_MAKE_DIR_NAME, strTemp);
 
 	std::string strDirName = (CT2CA)strTemp;
+
+	// 캡쳐를 하기 위해서 화면에서 현재 프로그램을 감춘다.
+	ShowWindow(SW_HIDE);
+
 	ImageCaputre(strDirName, 0);
 
 	// 캡쳐를 하기 위해서 감춘 화면을 다시 보여준다.
@@ -616,6 +633,9 @@ void CEbookToPDFDlg::OnBnClickedButtonCaptureStart()
 
 	std::string strDirName = (CT2CA)strTemp;
 	
+	ShowWindow(SW_SHOWMINIMIZED);
+	SetCaputreSize();
+
 	for (int i = 0; i <= m_nMaxCount; i++)
 	{
 		// 페이지 이동 필요
@@ -631,10 +651,27 @@ void CEbookToPDFDlg::OnBnClickedButtonCaptureStart()
 
 			if (time > m_fCaptureDelay)
 				break;
+
+			Sleep(1);
 		}
+
+		SetDlgItemInt(IDC_EDIT_CURRENT_COUNT, i);
 
 		ImageCaputre(strDirName, i);
 	}
 
 	// 완료.
+	this->ShowWindow(SW_SHOWDEFAULT);
+}
+
+
+void CEbookToPDFDlg::OnBnClickedButtonExit()
+{
+	exit(0);
+}
+
+
+void CEbookToPDFDlg::OnBnClickedButtonMinimize()
+{
+	this->ShowWindow(SW_SHOWMINIMIZED);
 }
