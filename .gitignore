@@ -78,6 +78,4 @@
 
 # Cache files for the editor to use
 **/DerivedDataCache/*
-/EbookToPDF/x64
-/EbookToPDF/x64/Debug
-EbookToPDF/x64/Debug/EbookToPDF.pdb
+**/EbookToPDF/x64/*
